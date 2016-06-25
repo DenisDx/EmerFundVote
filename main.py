@@ -250,7 +250,7 @@ class EmerFundVoteApp(App):
                     import walletconfig
                     walletconfig.make_config_connectable()
                     #popup = Popup(title='Allert',content=Label(text='please restart emercoin wallet'),size_hint=(None, None), size=(400, 400))
-                    popup.Popup(title='Allert',content=label.Label(text='please restart emercoin wallet'),size_hint=(.8, .8))
+                    #popup.Popup(title='Allert',content=label.Label(text='please restart emercoin wallet'),size_hint=(.8, .8))
 
                 else:
                     return 0
