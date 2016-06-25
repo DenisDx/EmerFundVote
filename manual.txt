@@ -16,3 +16,5 @@ sudo apt-get install python-kivy
 ----или------Python3 - python3-kivy:
 sudo apt-get install python3-kivy
     optionally the examples - kivy-examples
+
+----
