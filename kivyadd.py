@@ -1,5 +1,10 @@
+#!/usr/bin/kivy
+# -*- coding: UTF-8 -*-
+
+
 import kivy
 from kivy.uix.popup import Popup
+from kivy.uix.modalview import ModalView
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.boxlayout import BoxLayout
@@ -7,7 +12,7 @@ from kivy.uix.label import Label
 from kivy.app import App
 
 class MessageBox(App):
-    def __init__(self, parent, titleheader="Message", message="", options={"OK": ""}, size_hint=(.8,.2), font_size=0,  size=None):
+    def __init__(self, parent, titleheader="Message", message="", options={"OK": ""}, size_hint=(.8,.2), font_size=None,  size=None, modal=0):
     #def build(self, parent, titleheader="Message", message="", options={"OK": ""}, size_hint=(.8,.2),  size=(None, None)):
         def popup_callback(instance):
             self.retvalue = instance.text
@@ -37,7 +42,15 @@ class MessageBox(App):
             b_list.append(Button(text=b, on_press=popup_callback))
             #b_list[-1].bind(on_press=self.popup_callback)
             buttonbox.add_widget(b_list[-1])
-        self.popup = Popup(title=titleheader, content=box, size_hint=self.size_hint, size=self.size)
+        if modal:
+            #Допилить
+            self.popup = ModalView()
+            self.popup.title=titleheader
+            self.popup.size_hint=self.size_hint
+            self.popup.size=self.size
+            self.popup.add_widget(box)
+        else:
+            self.popup = Popup(title=titleheader, content=box, size_hint=self.size_hint, size=self.size)
         #self.popup = Popup(title=titleheader, content=box, size_hint=self.size_hint)
         self.popup.open()
         self.popup.bind(on_dismiss=self.OnClose)
@@ -49,6 +62,16 @@ class MessageBox(App):
             command = "self.parent."+self.options[self.retvalue]
             exec(command)
 
+class ModalDialog(App):
+    #полная херня
+    def __init__(self,parent,**kwargs):
+        from kivy.base import EventLoop
+        self.result=None
+        dlg = MessageBox(parent,**kwargs)
+        while (dlg) and (self.result is None):
+                EventLoop.idle()
+        return self.result
+
 if __name__ == '__main__':
     class MessageBoxTest(App):
         def open_alert(self,message=''):
@@ -59,9 +82,30 @@ if __name__ == '__main__':
         def open_yn(self,*args):
             dlg = MessageBox(parent=self, titleheader="YN header", message="Message", size_hint=(.9,.4),
                              options=({"YES": "open_alert(message='YES!')", "NO": "open_alert(message='NO!')","CANCEL": ""}))
+        def testmsg(self,a):
+            MessageBox(self,"a=%s"%a)
+
+
+        def open_3(self,*args):
+            self.ffoptions=({"a=1": "testmsg(1)", "a=2": "testmsg(2)","CANCEL": ""})
+            MessageBox(self, options=self.ffoptions)
+
+        def open_modalview(self,*args):
+            self.a=0
+            MessageBox(self, modal=1, options=({"a=1": "a=1", "a=2": "a=2","CANCEL": ""}))
+
+
+        def open_modal(self,*args):
+            res = ModalDialog(self, titleheader="ModalView mode", message="Message\nMessage\nMessage\nMessage\n", options=({"result=1": "testmsg(1)", "result=2": "testmsg(2)","CANCEL": ""}))
+            MessageBox(self,"res=%s"%res)
+
+
         def build(self):
             bl=BoxLayout(orientation= 'vertical')
             bl.add_widget(Button(text='Test alert', on_press=self.open_alert))
             bl.add_widget(Button(text='Test yn', on_press=self.open_yn))
+            bl.add_widget(Button(text='Test 3', on_press=self.open_3))
+            bl.add_widget(Button(text='Modalview test', on_press=self.open_modalview))
+            bl.add_widget(Button(text='Modal test', on_press=self.open_modal))
             return bl
     MessageBoxTest().run()

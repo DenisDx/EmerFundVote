@@ -4,12 +4,12 @@
 #EmerFundVoteApp
 
 from kivy.app import App
-from kivy.uix import boxlayout
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix import gridlayout
-from kivy.uix import button
+from kivy.uix.togglebutton import ToggleButton
 from kivy.uix import textinput
 from kivy.uix import popup
-from kivy.uix import label
+from kivy.uix.label import Label
 
 from kivy.lang import Builder
 from kivy.app import App
@@ -52,11 +52,12 @@ kv="""
                 id: votetable
 
         BoxLayout:
-            size_hint: 1, 0.1
+            size_hint: 1, None
+            height: 32
             orientation: 'horizontal'
             Button:
                 text: 'Settings'
-                on_press: root.manager.current = 'settings'
+                on_press: app.open_settings()
             Button:
                 text: 'Debug'
                 on_press: root.manager.current = 'debug'
@@ -118,9 +119,10 @@ kv="""
             Label:
                 text: "Addresses:"
                 id: lbstate
-            Button:
                 size_hint: None, 1
-                width: 55
+                width: 100
+            Button:
+                size_hint: 0.5, 1
                 text: 'Rebuild'
                 id: btrebuild
                 on_press: app.rebuild_addresses_list()
@@ -129,9 +131,18 @@ kv="""
             row_default_height: 32
             id: gladdresses
         Button:
-            text: 'Save'
+            text: 'Reload config'
+            size_hint: 1, None
+            height: 32
+            on_press: app.gui_load_config()
         Button:
-            size_hint: 1, 0.1
+            text: 'Save'
+            size_hint: 1, None
+            height: 32
+            on_press: app.gui_save_config()
+        Button:
+            size_hint: 1, None
+            height: 32
             text: 'Back to menu'
             on_press: root.manager.current = 'menu'
 <DebugScreen>:
@@ -163,7 +174,8 @@ kv="""
         TextInput:
             id: log
         Button:
-            size_hint: 1, 0.1
+            size_hint: 1, None
+            height: 32
             text: 'Back to menu'
             on_press: root.manager.current = 'menu'
                 
@@ -182,6 +194,8 @@ class DebugScreen(Screen):
 
 
 import votesapi
+
+from kivyadd import MessageBox
 
 class EmerFundVoteApp(App):
         		
@@ -215,6 +229,62 @@ class EmerFundVoteApp(App):
 
     def build_votes_table(self,votes):
         pass
+    #======================Конфиги
+    def open_settings(self, *largs):
+        self.sm.current = 'settings'
+        self.gui_load_config()
+
+    def gui_save_config(self):
+        #{'jsonrpc':1,'connection':{'host':'128.199.60.197'}}
+        self.votesapi.config['connection']['host']= self.sm.get_screen('settings').ids.tihost.text
+        if self.sm.get_screen('settings').ids.btwallet.state=='down':
+            self.votesapi.config['jsonrpc']=0
+        else:
+            self.votesapi.config['jsonrpc']=1
+        if self.sm.get_screen('settings').ids.tbmanual.state=='down':
+            self.votesapi.config['jsonrpc_sign']=0
+        else:
+            self.votesapi.config['jsonrpc_sign']=1
+
+        gl=self.sm.get_screen('settings').ids.gladdresses
+        self.votesapi.config['addresses']=[]
+        for c in gl.children:
+            #self.sm.get_screen('settings').ids['adr%s'%n].text
+            if c.children[0].state=='down':
+                self.votesapi.config['addresses'].append(c.children[0].text)
+
+        self.votesapi.save_config()
+
+
+    def get_addr_btn(self,addr):
+        gl=self.sm.get_screen('settings').ids.gladdresses
+        for c in gl.children:
+            if c.children[0].text==addr:
+                return c.children[0]
+        return None
+
+    def gui_load_config(self):
+        self.votesapi.load_config()
+        self.rebuild_addresses_list()
+        if self.votesapi.config['connection']:
+            self.sm.get_screen('settings').ids.tihost.text = self.votesapi.config['connection']['host']
+
+        if self.votesapi.config['jsonrpc']=='1' or self.votesapi.config['jsonrpc']==1:
+            self.sm.get_screen('settings').ids.btjson.state=='down'
+        else:
+            self.sm.get_screen('settings').ids.btwallet.state=='down'
+
+        #Сбрасываем выделения
+        for c in self.sm.get_screen('settings').ids.gladdresses.children:
+            c.children[0].state=='normal'
+
+        if 'addresses' in self.votesapi.config:
+            for addr in self.votesapi.config['addresses']:
+                b=self.get_addr_btn(addr)
+                if b is None:
+                    self.add_address_panel(len(self.sm.get_screen('settings').ids.gladdresses.children),'???',addr)
+                    b=self.get_addr_btn(addr)
+                b.state='down'
 
     def show_vote_table(self):
         #делаем запрос
@@ -241,20 +311,24 @@ class EmerFundVoteApp(App):
         if resp:
             self.sm.get_screen('debug').ids.log.text +='\n resp:%s'%resp
 
-    def check_rpc_config():
+    def turn_on_json(self):
+        import walletconfig
+        walletconfig.make_config_connectable()
+        MessageBox(parent=self,titleheader='Information: you have to restart the wallet app',message='Для продолжения работы перезапустите кошелек Emercoin', size_hint=(.9,None), size=(0,300))
+
+    def check_rpc_config(self):
         #Подключает конфигурацию доступа к кошельку по json
         #если уже подключено - ничего не делает
-        if not rpcconnet.configured:
+        if not rpcconnet.configured():
             if not rpcconnet.init_config():
-                if self.ask_for_turn_json_on():
-                    import walletconfig
-                    walletconfig.make_config_connectable()
-                    #popup = Popup(title='Allert',content=Label(text='please restart emercoin wallet'),size_hint=(None, None), size=(400, 400))
-                    #popup.Popup(title='Allert',content=label.Label(text='please restart emercoin wallet'),size_hint=(.8, .8))
+                #Спрашиваем одобрение включить json и включаем ежели одобрят
+                MessageBox(parent=self, titleheader="Do you want to turn JSON RPC server on?", message="""В настоящее время функция доступа к кошельку для других приложнний отключена.
+Для получения адресов и подписания голосов требуется включить эту функцию.
+Потом ее можно будет отключить.
 
-                else:
-                    return 0
-
+Включить сервер JSON для текущего кошелька?""", size_hint=(.9,.5), options=({"YES": "turn_on_json()", "NO (CANCEL)": ""}))
+                return 0
+        return 1
     def get_addresses_list(self,from_wallet=0):
         #получение списка адресов зависит от метода
         #метод определен в from_wallet
@@ -266,26 +340,29 @@ class EmerFundVoteApp(App):
             la=rpcconnet.walreq({"method": "listaccounts","params":[],"jsonrpc": "2.0","id": 0})['result']
             if la:
                 for a in la.keys():
-                    res.append(rpcconnet.walreq({"method": "getaddressesbyaccount","params":[a],"jsonrpc": "2.0","id": 0})['result'])
+                    res.append((a,rpcconnet.walreq({"method": "getaddressesbyaccount","params":[a],"jsonrpc": "2.0","id": 0})['result']))
         return res
+
+    def add_address_panel(self,n,ltext,addr):
+        bl=BoxLayout(orientation= 'horizontal',size_hint=(1, None), height=32)
+        bl.add_widget(Label(text=ltext,size_hint=(None,1), width=100))
+        bl.add_widget(ToggleButton(text=addr,id='adr%s'%n)) #, on_press=self.open_3
+        self.sm.get_screen('settings').ids.gladdresses.add_widget(bl)
+
     def rebuild_addresses_list(self):
         #создание нового списка адресов в
         #import kivy.uix
         #gl=kivy.uix.gridlayout()
-        gl=self.sm.get_screen('settings').ids.gladdresses
-        for c in gl.children:
-            c.dispose()
-        #‘down’/checked
-        from kivy.uix import modalview
-        #pp=popup.Popup(title='Allert',content=label.Label(text='please restart emercoin wallet'),size_hint=(.8, .8))
-        #pp=modalview.ModalView(title='Allert',content=label.Label(text='please restart emercoin wallet'),size_hint=(.8, .8))
-        pp=modalview.ModalView(size_hint=(.8, .8))
-        self.sm.get_screen('settings').add_widget(pp)
-        pp.open()
-        #popup.Popup(title='Allert',content=label.Label(text='please restart emercoin wallet'),size_hint=(.8, .8)).open()
+
+        for c in self.sm.get_screen('settings').ids.gladdresses.children:
+            pass
         al=self.get_addresses_list(self.sm.get_screen('settings').ids.btwallet.state=='down')
         for a in al:
             #создаем панель высотой 32 пиксела, на ней - чекпокс и метку с адресом
-            print(a)
+            n=0
+            for addr in a[1]:
+                self.add_address_panel(n,a[0],addr)
+                n+=1
+
 if __name__ == '__main__':
     EmerFundVoteApp().run()

@@ -197,7 +197,7 @@ def generate_random_pass(n=24):
 def is_config_connectable():
     cfg=read_default_config()
     if not cfg: return 0
-    if ('server' not in cfg) or (not cfg['server']): return 0
+    if ('server' not in cfg) or (not cfg['server']) or (cfg['server']=='0'): return 0
     return 1
 
 def make_config_connectable():
@@ -215,7 +215,7 @@ def make_config_connectable():
         else:
             return 0
 
-    if ('server' not in cfg) or (not cfg['server']):
+    if ('server' not in cfg) or (not cfg['server']) or (cfg['server']=='0'):
         #сервер не настроен
         cfg['server']=1
         addifnone(cfg,'rpcuser',"defaultuser")
