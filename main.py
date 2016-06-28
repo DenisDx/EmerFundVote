@@ -261,6 +261,8 @@ class EmerFundVoteApp(App):
 
     def gui_save_config(self):
         #{'jsonrpc':1,'connection':{'host':'128.199.60.197'}}
+        if 'connection' not in self.votesapi.config:
+            self.votesapi.config['connection']={}
         self.votesapi.config['connection']['host']= self.sm.get_screen('settings').ids.tihost.text
 
         if self.sm.get_screen('settings').ids.btwallet.state=='down':
@@ -311,8 +313,11 @@ class EmerFundVoteApp(App):
     def gui_load_config(self):
         self.votesapi.load_config()
 
-        if 'connection' in self.votesapi.config and self.votesapi.config['connection']:
-            if self.votesapi.config['connection']['host']=='': self.votesapi.config['connection']['host'] ='128.199.60.197'
+        #if ('connection' not in self.votesapi.config):
+        #    self.votesapi.config['connection']={}
+        if 'connection' not in self.votesapi.config or self.votesapi.config['connection']['host']=='':
+            self.sm.get_screen('settings').ids.tihost.text = '128.199.60.197'
+        else:
             self.sm.get_screen('settings').ids.tihost.text = self.votesapi.config['connection']['host']
 
         #wallet_method btjson btwallet btmanual
@@ -370,8 +375,10 @@ class EmerFundVoteApp(App):
 
         if not self.votesapi.config:
             self.votesapi.load_config()
-        if 'connection' in self.votesapi.config and self.votesapi.config['connection']:
-            if self.votesapi.config['connection']['host']=='': self.votesapi.config['connection']['host'] ='128.199.60.197'
+        if ('connection' not in self.votesapi.config):
+            self.votesapi.config['connection']={}
+        if ('host' not in self.votesapi.config['connection']) or self.votesapi.config['connection']['host']=='':
+            self.votesapi.config['connection']['host'] ='128.199.60.197'
 
         resp=self.votesapi.do_request('list',params)
 
