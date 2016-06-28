@@ -196,6 +196,7 @@ class DebugScreen(Screen):
 import votesapi
 
 from kivyadd import MessageBox
+from kivyadd import ThreadMessageBox
 
 class EmerFundVoteApp(App):
         		
@@ -265,14 +266,17 @@ class EmerFundVoteApp(App):
 
     def gui_load_config(self):
         self.votesapi.load_config()
-        self.rebuild_addresses_list()
-        if self.votesapi.config['connection']:
+        from kivy.clock import Clock
+        if 'addresses' in self.votesapi.config:
+            self.rebuild_addresses_list()
+        if 'connection' in self.votesapi.config and self.votesapi.config['connection']:
             self.sm.get_screen('settings').ids.tihost.text = self.votesapi.config['connection']['host']
 
-        if self.votesapi.config['jsonrpc']=='1' or self.votesapi.config['jsonrpc']==1:
-            self.sm.get_screen('settings').ids.btjson.state=='down'
-        else:
-            self.sm.get_screen('settings').ids.btwallet.state=='down'
+        if 'jsonrpc' in self.votesapi.config:
+            if self.votesapi.config['jsonrpc']=='1' or self.votesapi.config['jsonrpc']==1:
+                self.sm.get_screen('settings').ids.btjson.state=='down'
+            else:
+                self.sm.get_screen('settings').ids.btwallet.state=='down'
 
         #Сбрасываем выделения
         for c in self.sm.get_screen('settings').ids.gladdresses.children:
@@ -285,7 +289,6 @@ class EmerFundVoteApp(App):
                     self.add_address_panel(len(self.sm.get_screen('settings').ids.gladdresses.children),'???',addr)
                     b=self.get_addr_btn(addr)
                 b.state='down'
-
     def show_vote_table(self):
         #делаем запрос
         #строим грид
@@ -350,10 +353,12 @@ class EmerFundVoteApp(App):
         self.sm.get_screen('settings').ids.gladdresses.add_widget(bl)
 
     def rebuild_addresses_list(self):
+         ThreadMessageBox(self._rebuild_addresses_list,{},self, modal=1, titleheader="Information: loading data, please wait", message="Пожалуйста, подождите, идет загрузка данных")
+
+    def _rebuild_addresses_list(self):
         #создание нового списка адресов в
         #import kivy.uix
         #gl=kivy.uix.gridlayout()
-
         for c in self.sm.get_screen('settings').ids.gladdresses.children:
             pass
         al=self.get_addresses_list(self.sm.get_screen('settings').ids.btwallet.state=='down')

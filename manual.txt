@@ -17,4 +17,6 @@ sudo apt-get install python-kivy
 sudo apt-get install python3-kivy
     optionally the examples - kivy-examples
 
-----
+----Для сборки
+pip install PyInstaller если он не установлен
+Может потребоваться прописать пути к каталогу с питоном и ХХХ\PythonХХХ\Scripts  C:\Python34\Lib\site-packages\PyInstaller\loader

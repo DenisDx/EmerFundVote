@@ -61,6 +61,30 @@ class MessageBox(App):
         if self.retvalue != None and self.options[self.retvalue] != "":
             command = "self.parent."+self.options[self.retvalue]
             exec(command)
+    def dismiss(self):
+        self.retvalue = 'dismiss'
+        self.popup.dismiss()
+
+from threading import Thread
+from time import sleep
+
+
+#Это класс для запуска функции в отдельном потоке, которая показывает окно ожидания пока эта функция работает, а потом его закрывает
+class ThreadMessageBox(App):
+    def __init__(self,function,fargs,parent,**kwargs):
+        self.terminated = False
+        self.parent=parent
+        self.kwargs=kwargs
+        self.function=function
+        self.fargs=fargs
+        Thread(target=self.work_cycle).start()
+        self.dlg = MessageBox(self.parent,**self.kwargs)
+    def work_cycle(self):
+        #dlg = MessageBox(self.parent,**self.kwargs)
+        self.function(**self.fargs)
+        self.dlg.dismiss()
+    def close(self):
+        self.terminated = True
 
 class ModalDialog(App):
     #полная херня
@@ -94,11 +118,18 @@ if __name__ == '__main__':
             self.a=0
             MessageBox(self, modal=1, options=({"a=1": "a=1", "a=2": "a=2","CANCEL": ""}))
 
-
         def open_modal(self,*args):
             res = ModalDialog(self, titleheader="ModalView mode", message="Message\nMessage\nMessage\nMessage\n", options=({"result=1": "testmsg(1)", "result=2": "testmsg(2)","CANCEL": ""}))
             MessageBox(self,"res=%s"%res)
 
+        def long_time_work(self,steps):
+            r=100000.
+            for i in range(steps):
+                r=r/(i+1)+r*i
+            print(r)
+
+        def open_tmb(self,*args):
+            ThreadMessageBox(self.long_time_work,{'steps':1000000},self, size_hint=(.9,.4), titleheader="ThreadMessageBox test", message="Подождите, \nне спешите...\n", options=({"Stop": ""}))
 
         def build(self):
             bl=BoxLayout(orientation= 'vertical')
@@ -107,5 +138,7 @@ if __name__ == '__main__':
             bl.add_widget(Button(text='Test 3', on_press=self.open_3))
             bl.add_widget(Button(text='Modalview test', on_press=self.open_modalview))
             bl.add_widget(Button(text='Modal test', on_press=self.open_modal))
+
+            bl.add_widget(Button(text='ThreadMessageBox test', on_press=self.open_tmb))
             return bl
     MessageBoxTest().run()
