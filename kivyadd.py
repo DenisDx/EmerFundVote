@@ -8,11 +8,12 @@ from kivy.uix.modalview import ModalView
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.textinput import TextInput
 from kivy.uix.label import Label
 from kivy.app import App
 
 class MessageBox(App):
-    def __init__(self, parent, titleheader="Message", message="", options={"OK": ""}, size_hint=(.8,.2), font_size=None,  size=None, modal=0):
+    def __init__(self, parent, titleheader="Message", message="", options={"OK": ""}, size_hint=(.8,.3), font_size=None,  size=None, modal=0, edit_add = False, edit_default_text=""):
     #def build(self, parent, titleheader="Message", message="", options={"OK": ""}, size_hint=(.8,.2),  size=(None, None)):
         def popup_callback(instance):
             self.retvalue = instance.text
@@ -25,6 +26,8 @@ class MessageBox(App):
         self.message = message
         self.options = options
         self.font_size=font_size
+        self.edit_add=edit_add
+        self.edit_default_text=edit_default_text
         if size: self.size = size
         else: self.size=(0,0)
         if size_hint: self.size_hint=size_hint
@@ -35,6 +38,10 @@ class MessageBox(App):
         #self.add_widget(box)
         #box.add_widget(Label(text=self.message, font_size=self.font_size))
         box.add_widget(Label(text=self.message))
+
+        if self.edit_add:
+            self.edit=TextInput(text=self.edit_default_text)
+            box.add_widget(self.edit)
         b_list =  []
         buttonbox = BoxLayout(orientation='horizontal',size_hint=(1, None),height=32)
         box.add_widget(buttonbox)
@@ -59,7 +66,7 @@ class MessageBox(App):
         self.popup.unbind(on_dismiss=self.OnClose)
         self.popup.dismiss()
         if self.retvalue != None and self.retvalue in self.options and self.options[self.retvalue] != "":
-            command = "self.parent."+self.options[self.retvalue]
+            command = "self.parent."+ self.options[self.retvalue]%self.edit.text if self.edit_add else self.options[self.retvalue]
             exec(command)
     def dismiss(self):
         self.retvalue = 'dismiss'

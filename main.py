@@ -3,21 +3,16 @@
 
 #EmerFundVoteApp
 
-from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix import gridlayout
 from kivy.uix.togglebutton import ToggleButton
-from kivy.uix import textinput
-from kivy.uix import popup
 from kivy.uix.label import Label
+
+from kivy.uix.textinput import TextInput
 
 from kivy.lang import Builder
 from kivy.app import App
-#from time import sleep
-#import kivy.clock 
 
-import socket
-import sys
+#from kivy.uix.scrollview import ScrollView
 
 import rpcconnet
 
@@ -28,28 +23,27 @@ kv="""
     BoxLayout:
         orientation: 'vertical'
         BoxLayout:
+            size_hint: 1, None
+            height:32
+            orientation: 'horizontal'
+            Label:
+                size_hint: (None, 1)
+                width: 25
+                text: "D1:"
+            TextInput:
+                id: d1
+            Label:
+                size_hint: None, 1
+                width: 25
+                text: "D2:"
+            TextInput:
+                id: d2
+            Button:
+                text: 'Show'
+                on_press: app.show_vote_table()
+        BoxLayout:
             orientation: 'vertical'
-            BoxLayout:
-                size_hint: 1, None
-                height:32
-                orientation: 'horizontal'
-                Label:
-                    size_hint: (None, 1)
-                    width: 25
-                    text: "D1:"
-                TextInput:
-                    id: d1
-                Label:
-                    size_hint: None, 1
-                    width: 25
-                    text: "D2:"
-                TextInput:
-                    id: d2
-                Button:
-                    text: 'show'
-                    on_press: app.show_vote_table()
-            BoxLayout:
-                id: votetable
+            id: votetable
 
         BoxLayout:
             size_hint: 1, None
@@ -81,6 +75,10 @@ kv="""
         BoxLayout:
             orientation: 'horizontal'
             size_hint: 1, None
+            height: 25
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint: 1, None
             height: 32
             Label:
                 size_hint: None, 1
@@ -95,6 +93,26 @@ kv="""
                 group: "gaddsource"
                 text: 'Use local wallet.dat'
                 id: btwallet
+            ToggleButton:
+                group: "gaddsource"
+                text: 'Manual'
+                id: btmanual
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint: 1, None
+            height: 32
+            Label:
+                size_hint: None, 1
+                width: 100
+                text: "Wallet path"
+            TextInput:
+                id: ti_wallet_file
+                text: ''
+            Button:
+                size_hint: None, 1
+                wight: 100
+                text: 'Choose...'
+                id: b_wallet_file
         BoxLayout:
             orientation: 'horizontal'
             size_hint: 1, None
@@ -106,12 +124,16 @@ kv="""
                 id: lbstate
             ToggleButton
                 group: "gsignmethod"
-                text: "sign using json api"
-                id: tbjson
+                text: "Sign using json api"
+                id: btjsonsign
             ToggleButton
                 group: "gsignmethod"
-                text: "sign manual"
-                id: tbmanual
+                text: "Sign manual"
+                id: btmanualsign
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint: 1, None
+            height: 25
         BoxLayout:
             orientation: 'horizontal'
             size_hint: 1, None
@@ -122,10 +144,14 @@ kv="""
                 size_hint: None, 1
                 width: 100
             Button:
-                size_hint: 0.5, 1
                 text: 'Rebuild'
                 id: btrebuild
                 on_press: app.rebuild_addresses_list()
+            Button:
+                text: 'Add manual'
+                id: btmanualadd
+                on_press: app.settings_manual_add_address()
+
         GridLayout:
             cols: 1
             row_default_height: 32
@@ -170,7 +196,7 @@ kv="""
             Button:
                 size_hint: 0.2, 1
                 text: 'send'
-                on_release: app.send(root.ids.edit1.text,root.ids.edit2.text)
+                on_release: app.debug_send(root.ids.edit1.text,root.ids.edit2.text)
         TextInput:
             id: log
         Button:
@@ -228,8 +254,6 @@ class EmerFundVoteApp(App):
     def on_stop(self):
         pass
 
-    def build_votes_table(self,votes):
-        pass
     #======================Конфиги
     def open_settings(self, *largs):
         self.sm.current = 'settings'
@@ -238,14 +262,20 @@ class EmerFundVoteApp(App):
     def gui_save_config(self):
         #{'jsonrpc':1,'connection':{'host':'128.199.60.197'}}
         self.votesapi.config['connection']['host']= self.sm.get_screen('settings').ids.tihost.text
+
         if self.sm.get_screen('settings').ids.btwallet.state=='down':
-            self.votesapi.config['jsonrpc']=0
+            self.votesapi.config['wallet_method']='wallet'
+        elif self.sm.get_screen('settings').ids.btmanual.state=='down':
+            self.votesapi.config['wallet_method']='manual'
         else:
-            self.votesapi.config['jsonrpc']=1
-        if self.sm.get_screen('settings').ids.tbmanual.state=='down':
+            self.votesapi.config['wallet_method']='json'
+
+        if self.sm.get_screen('settings').ids.btmanualsign.state=='down':
             self.votesapi.config['jsonrpc_sign']=0
         else:
             self.votesapi.config['jsonrpc_sign']=1
+
+        self.votesapi.config['wallet_file']=self.sm.get_screen('settings').ids.ti_wallet_file.text
 
         gl=self.sm.get_screen('settings').ids.gladdresses
         self.votesapi.config['addresses']=[]
@@ -281,16 +311,36 @@ class EmerFundVoteApp(App):
     def gui_load_config(self):
         self.votesapi.load_config()
         from kivy.clock import Clock
-        if 'addresses' in self.votesapi.config:
-            self.rebuild_addresses_list()
         if 'connection' in self.votesapi.config and self.votesapi.config['connection']:
             self.sm.get_screen('settings').ids.tihost.text = self.votesapi.config['connection']['host']
 
-        if 'jsonrpc' in self.votesapi.config:
-            if self.votesapi.config['jsonrpc']=='1' or self.votesapi.config['jsonrpc']==1:
-                self.sm.get_screen('settings').ids.btjson.state=='down'
+        #wallet_method btjson btwallet btmanual
+        if 'wallet_method' in self.votesapi.config:
+            if self.votesapi.config['wallet_method']=='wallet':
+                self.sm.get_screen('settings').ids.btwallet.state='down'
+            elif self.votesapi.config['wallet_method']=='manual':
+                self.sm.get_screen('settings').ids.btmanual.state='down'
             else:
-                self.sm.get_screen('settings').ids.btwallet.state=='down'
+                self.sm.get_screen('settings').ids.btjson.state='down'
+
+
+        if 'jsonrpc_sign' in self.votesapi.config:
+            if self.votesapi.config['jsonrpc_sign']=='1' or self.votesapi.config['jsonrpc_sign']==1:
+                self.sm.get_screen('settings').ids.btjsonsign.state='down'
+            else:
+                self.sm.get_screen('settings').ids.btmanualsign.state='down'
+
+
+        if self.sm.get_screen('settings').ids.btmanualsign.state=='down':
+            self.votesapi.config['jsonrpc_sign']=0
+        else:
+            self.votesapi.config['jsonrpc_sign']=1
+
+        if 'wallet_file' in self.votesapi.config:
+            self.sm.get_screen('settings').ids.ti_wallet_file.text = self.votesapi.config['wallet_file']
+
+        if 'addresses' in self.votesapi.config:
+            self.rebuild_addresses_list()
 
         #Сбрасываем выделения
         for c in self.sm.get_screen('settings').ids.gladdresses.children:
@@ -304,22 +354,55 @@ class EmerFundVoteApp(App):
                 #    b=self.get_addr_btn(addr)
                 b=self.settings_add_update_address_button(addr)
                 b.state='down'
-    def show_vote_table(self):
-        #делаем запрос
-        #строим грид
-        votes = self.votesapi.get_votes()
-        if votes:
-            self.sm.get_screen('debug').ids.log.text +='\n %s votes received'%len(votes)
-            self.build_votes_table(votes)
-        return 1
 
-    def send(self,req,data):
+
+    def show_vote_table(self):
+        #Удаляем текущие голосования и запускаем запрос новых
+        for c in self.sm.get_screen('menu').ids.votetable.children:
+            c.dismiss()
+
+        ThreadMessageBox(self._show_vote_table,{},self, modal=1, titleheader="Information: loading data, please wait", message="Пожалуйста, подождите, идет загрузка данных голосований")
+
+    def _show_vote_table(self):
+        params={}
+        resp=self.votesapi.do_request('list',params)
+
+        if resp:
+            for v in resp:
+                bl = BoxLayout(orientation= 'vertical',size_hint=(1, None), height=32+32+16+5)
+
+                blt = BoxLayout(orientation= 'horizontal',size_hint=(1, None), height=32)
+                blb = BoxLayout(orientation= 'horizontal')
+
+
+                #votes
+                blt.add_widget(ToggleButton(text='YES',size_hint=(None, 1), width=32,group='gg%s'%v['question_id'],id='by%s'%v['question_id'])) #, on_press=self.open_3
+                blt.add_widget(ToggleButton(text='NO',size_hint=(None, 1), width=32,group='gg%s'%v['question_id'],id='bn%s'%v['question_id'])) #, on_press=self.open_3
+                #blt.add_widget(Label(text='#%s:%s'%(v['question_id'],v['name']),size_hint=(None,1), width=200))
+                #blt.add_widget(Label(text='Q:%s'%v['qmin'],size_hint=(None,1), width=50))
+                #blt.add_widget(Label(text='L:%s'%v['lmin'],size_hint=(None,1), width=50))
+                #blt.add_widget(Label(text='%s - %s'%(v['begin_date'],v['end_date']),size_hint=(None,1), width=200))
+
+                blt.add_widget(Label(text='#%s:%s'%(v['question_id'],v['name']),size_hint=(.4,1)))
+                blt.add_widget(Label(text='Q:%s'%v['qmin'],size_hint=(.1,1)))
+                blt.add_widget(Label(text='L:%s'%v['lmin'],size_hint=(.1,1)))
+                blt.add_widget(Label(text='%s - %s'%(v['begin_date'],v['end_date']),size_hint=(.4,1)))
+
+                blb.add_widget(TextInput(text=v['descr']))
+
+                bl.add_widget(Label(text='',size_hint=(1, None), height=5))
+                bl.add_widget(blt)
+                bl.add_widget(blb)
+                self.sm.get_screen('menu').ids.votetable.add_widget(bl)
+
+
+    def debug_send(self,req,data):
         #pass
         #self.sm.get_screen('debug').ids.log.text +='\n send:'+data
         #sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # Internet # UDP
         #sock.sendto(data, ("127.0.0.1", 1984))
-        import json
         try:
+            import json
             d=json.loads(data)
         except:
             import sys
@@ -347,15 +430,25 @@ class EmerFundVoteApp(App):
 Включить сервер JSON для текущего кошелька?""", size_hint=(.9,.5), options=({"YES": "turn_on_json()", "NO (CANCEL)": ""}))
                 return 0
         return 1
-    def get_addresses_list(self,from_wallet=0):
+    def get_addresses_list(self,wallet_method=""):
         #получение списка адресов зависит от метода
         #метод определен в from_wallet
         res=[]
-        if from_wallet:
-            pass
-        else:
+        if not wallet_method:
+            if 'wallet_method' in self.votesapi.config:
+                wallet_method=self.votesapi.config['wallet_method']
+            else:
+                return res
+
+        if wallet_method=='wallet':
+            return res
+        elif wallet_method=='json':
             if not self.check_rpc_config(): return []
-            la=rpcconnet.walreq({"method": "listaccounts","params":[],"jsonrpc": "2.0","id": 0})['result']
+            try:
+                la=rpcconnet.walreq({"method": "listaccounts","params":[],"jsonrpc": "2.0","id": 0})['result']
+            except:
+                MessageBox(parent=self,titleheader='Error: can\'t access wallet application',message='Приложение "кошелек Emercoin" недоступно.\nВозможно, кошелек не запущен\nили требует его перезапуска', size_hint=(.9,0.4))
+                return res
             if la:
                 for a in la.keys():
                     res.append((a,rpcconnet.walreq({"method": "getaddressesbyaccount","params":[a],"jsonrpc": "2.0","id": 0})['result']))
@@ -371,21 +464,33 @@ class EmerFundVoteApp(App):
     def rebuild_addresses_list(self):
          ThreadMessageBox(self._rebuild_addresses_list,{},self, modal=1, titleheader="Information: loading data, please wait", message="Пожалуйста, подождите, идет загрузка данных")
 
+    def settings_manual_add_address(self):
+         MessageBox(self, options=({"Ok": "settings_add_update_address_button('\%s')","Cancel": ""}), edit_add=True , titleheader="Request: please enter a new address", message="Пожалуйста введите новый адрес")
+
     def _rebuild_addresses_list(self):
         #создание нового списка адресов в
         #import kivy.uix
         #gl=kivy.uix.gridlayout()
+
 
         #Удаление старых элементов. Пока не практикуем.
         for c in self.sm.get_screen('settings').ids.gladdresses.children:
             pass
 
         #Добавляем (обновляем наименование) для новых, если они есть
-        al=self.get_addresses_list(self.sm.get_screen('settings').ids.btwallet.state=='down')
+        wm='json'
+        if self.sm.get_screen('settings').ids.btwallet.state=='down':wm='wallet'
+        elif self.sm.get_screen('settings').ids.btmanual.state=='down':wm='manual'
+
+        al=self.get_addresses_list(wm)
         for a in al:
-            #создаем панель высотой 32 пиксела, на ней - чекпокс и метку с адресом
             for addr in a[1]:
                 self.settings_add_update_address_button(addr,a[0])
+
+        #Эта функция вызвана в потоке. Если она очень быстро отработает, то окно может не закрыться. Потом даем внешнему процессу прочхаться
+        import time
+        time.sleep(0.02)
+
 
 if __name__ == '__main__':
     EmerFundVoteApp().run()
