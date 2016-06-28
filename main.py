@@ -95,7 +95,7 @@ kv="""
                 id: btwallet
             ToggleButton:
                 group: "gaddsource"
-                text: 'Manual'
+                text: 'Add manually'
                 id: btmanual
         BoxLayout:
             orientation: 'horizontal'
@@ -128,7 +128,7 @@ kv="""
                 id: btjsonsign
             ToggleButton
                 group: "gsignmethod"
-                text: "Sign manual"
+                text: "Sign manually"
                 id: btmanualsign
         BoxLayout:
             orientation: 'horizontal'
@@ -423,7 +423,7 @@ class EmerFundVoteApp(App):
         if not rpcconnet.configured():
             if not rpcconnet.init_config():
                 #Спрашиваем одобрение включить json и включаем ежели одобрят
-                MessageBox(parent=self, titleheader="Do you want to turn JSON RPC server on?", message="""В настоящее время функция доступа к кошельку для других приложнний отключена.
+                MessageBox(self, titleheader="Do you want to turn JSON RPC server on?", message="""В настоящее время функция доступа к кошельку для других приложнний отключена.
 Для получения адресов и подписания голосов требуется включить эту функцию.
 Потом ее можно будет отключить.
 

@@ -66,7 +66,7 @@ class MessageBox(App):
         self.popup.unbind(on_dismiss=self.OnClose)
         self.popup.dismiss()
         if self.retvalue != None and self.retvalue in self.options and self.options[self.retvalue] != "":
-            command = "self.parent."+ self.options[self.retvalue]%self.edit.text if self.edit_add else self.options[self.retvalue]
+            command = "self.parent."+ (self.options[self.retvalue]%self.edit.text if self.edit_add else self.options[self.retvalue])
             exec(command)
     def dismiss(self):
         self.retvalue = 'dismiss'
