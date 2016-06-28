@@ -257,13 +257,27 @@ class EmerFundVoteApp(App):
         self.votesapi.save_config()
 
 
-    def get_addr_btn(self,addr):
+    def settings_get_addr_btn(self,addr):
         gl=self.sm.get_screen('settings').ids.gladdresses
         for c in gl.children:
             if c.children[0].text==addr:
                 return c.children[0]
         return None
 
+    def settings_get_address_label(self,b):
+        #по кнопке возвращает этикетку
+        return b.parent.children[1]
+
+    def settings_add_update_address_button(self,addr,text='???'):
+        b=self.settings_get_addr_btn(addr)
+        if b:
+            #кнопка есть
+            if text!='???':
+                self.settings_get_address_label(b).text=text
+        else:
+            #добавляем кнопку и метку
+            return self.add_address_panel(len(self.sm.get_screen('settings').ids.gladdresses.children),text,addr).children[0]
+        return b
     def gui_load_config(self):
         self.votesapi.load_config()
         from kivy.clock import Clock
@@ -284,10 +298,11 @@ class EmerFundVoteApp(App):
 
         if 'addresses' in self.votesapi.config:
             for addr in self.votesapi.config['addresses']:
-                b=self.get_addr_btn(addr)
-                if b is None:
-                    self.add_address_panel(len(self.sm.get_screen('settings').ids.gladdresses.children),'???',addr)
-                    b=self.get_addr_btn(addr)
+                #b=self.get_addr_btn(addr)
+                #if b is None:
+                #    self.add_address_panel(len(self.sm.get_screen('settings').ids.gladdresses.children),'???',addr)
+                #    b=self.get_addr_btn(addr)
+                b=self.settings_add_update_address_button(addr)
                 b.state='down'
     def show_vote_table(self):
         #делаем запрос
@@ -351,6 +366,7 @@ class EmerFundVoteApp(App):
         bl.add_widget(Label(text=ltext,size_hint=(None,1), width=100))
         bl.add_widget(ToggleButton(text=addr,id='adr%s'%n)) #, on_press=self.open_3
         self.sm.get_screen('settings').ids.gladdresses.add_widget(bl)
+        return bl
 
     def rebuild_addresses_list(self):
          ThreadMessageBox(self._rebuild_addresses_list,{},self, modal=1, titleheader="Information: loading data, please wait", message="Пожалуйста, подождите, идет загрузка данных")
@@ -359,15 +375,17 @@ class EmerFundVoteApp(App):
         #создание нового списка адресов в
         #import kivy.uix
         #gl=kivy.uix.gridlayout()
+
+        #Удаление старых элементов. Пока не практикуем.
         for c in self.sm.get_screen('settings').ids.gladdresses.children:
             pass
+
+        #Добавляем (обновляем наименование) для новых, если они есть
         al=self.get_addresses_list(self.sm.get_screen('settings').ids.btwallet.state=='down')
         for a in al:
             #создаем панель высотой 32 пиксела, на ней - чекпокс и метку с адресом
-            n=0
             for addr in a[1]:
-                self.add_address_panel(n,a[0],addr)
-                n+=1
+                self.settings_add_update_address_button(addr,a[0])
 
 if __name__ == '__main__':
     EmerFundVoteApp().run()
