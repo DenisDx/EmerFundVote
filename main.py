@@ -310,8 +310,9 @@ class EmerFundVoteApp(App):
         return b
     def gui_load_config(self):
         self.votesapi.load_config()
-        from kivy.clock import Clock
+
         if 'connection' in self.votesapi.config and self.votesapi.config['connection']:
+            if self.votesapi.config['connection']['host']=='': self.votesapi.config['connection']['host'] ='128.199.60.197'
             self.sm.get_screen('settings').ids.tihost.text = self.votesapi.config['connection']['host']
 
         #wallet_method btjson btwallet btmanual
@@ -358,13 +359,20 @@ class EmerFundVoteApp(App):
 
     def show_vote_table(self):
         #Удаляем текущие голосования и запускаем запрос новых
-        for c in self.sm.get_screen('menu').ids.votetable.children:
-            c.dismiss()
+        while len(self.sm.get_screen('menu').ids.votetable.children)>0:
+            self.sm.get_screen('menu').ids.votetable.remove_widget(self.sm.get_screen('menu').ids.votetable.children[0])
+            #c.dismiss()
 
         ThreadMessageBox(self._show_vote_table,{},self, modal=1, titleheader="Information: loading data, please wait", message="Пожалуйста, подождите, идет загрузка данных голосований")
 
     def _show_vote_table(self):
         params={}
+
+        if not self.votesapi.config:
+            self.votesapi.load_config()
+        if 'connection' in self.votesapi.config and self.votesapi.config['connection']:
+            if self.votesapi.config['connection']['host']=='': self.votesapi.config['connection']['host'] ='128.199.60.197'
+
         resp=self.votesapi.do_request('list',params)
 
         if resp:
