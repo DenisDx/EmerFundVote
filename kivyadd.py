@@ -90,6 +90,17 @@ class ThreadMessageBox(App):
         #dlg = MessageBox(self.parent,**self.kwargs)
         self.function(**self.fargs)
         self.dlg.dismiss()
+
+        #вроде работает без этого:
+        '''
+        from threading import Lock
+        lock = Lock()
+        lock.acquire()
+        try:
+            self.dlg.dismiss()
+        finally:
+            lock.release()
+        '''
     def close(self):
         self.terminated = True
 

@@ -12,6 +12,8 @@ from kivy.uix.textinput import TextInput
 from kivy.lang import Builder
 from kivy.app import App
 
+from kivy.clock import Clock
+
 #from kivy.uix.scrollview import ScrollView
 
 import rpcconnet
@@ -41,9 +43,13 @@ kv="""
             Button:
                 text: 'Show'
                 on_press: app.show_vote_table()
-        BoxLayout:
-            orientation: 'vertical'
-            id: votetable
+        ScrollView:
+            BoxLayout:
+                size_hint: 1, None
+                height:400
+
+                orientation: 'vertical'
+                id: votetable
 
         BoxLayout:
             size_hint: 1, None
@@ -87,13 +93,16 @@ kv="""
                 id: lbstate
             ToggleButton:
                 group: "gaddsource"
+                background_color:(1,1.2,1.5,1)
                 text: 'Use json'
                 id: btjson
             ToggleButton:
+                background_color:(1,1.2,1.5,1)
                 group: "gaddsource"
                 text: 'Use local wallet.dat'
                 id: btwallet
             ToggleButton:
+                background_color:(1,1.2,1.5,1)
                 group: "gaddsource"
                 text: 'Add manually'
                 id: btmanual
@@ -124,9 +133,13 @@ kv="""
                 id: lbstate
             ToggleButton
                 group: "gsignmethod"
+                background_color:(1,1.2,1.5,1)
                 text: "Sign using json api"
                 id: btjsonsign
             ToggleButton
+                background_color:(1,1.2,1.5,1)
+                background_normal: 'atlas://data/images/defaulttheme/button'
+                background_down: 'atlas://data/images/defaulttheme/button_pressed'
                 group: "gsignmethod"
                 text: "Sign manually"
                 id: btmanualsign
@@ -151,11 +164,13 @@ kv="""
                 text: 'Add manual'
                 id: btmanualadd
                 on_press: app.settings_manual_add_address()
-
-        GridLayout:
-            cols: 1
-            row_default_height: 32
-            id: gladdresses
+        ScrollView:
+            GridLayout:
+                cols: 1
+                size_hint: 1, None
+                height: 64
+                row_default_height: 32
+                id: gladdresses
         Button:
             text: 'Reload config'
             size_hint: 1, None
@@ -235,6 +250,12 @@ class EmerFundVoteApp(App):
         #    print('NI Title exists:')
         # Create the screen manager
 
+        #from kivy.atlas import Atlas
+        #from kivy.cache import Cache
+        #self.atlas= Atlas('theme-1.atlas')
+        #Cache.append("kv.atlas", 'data/images/defaulttheme', self.atlas)
+        
+
         self.gui=Builder.load_string(kv)
         self.sm = ScreenManager()
         self.sm.add_widget(MenuScreen(name='menu'))
@@ -242,6 +263,7 @@ class EmerFundVoteApp(App):
         self.sm.add_widget(DebugScreen(name='debug'))
 
         self.votesapi=votesapi.votesapi()
+
 
         return self.sm
 
@@ -285,6 +307,7 @@ class EmerFundVoteApp(App):
             #self.sm.get_screen('settings').ids['adr%s'%n].text
             if c.children[0].state=='down':
                 self.votesapi.config['addresses'].append(c.children[0].text)
+        gl.height=len(gl.children)*32
 
         self.votesapi.save_config()
 
@@ -361,7 +384,6 @@ class EmerFundVoteApp(App):
                 b=self.settings_add_update_address_button(addr)
                 b.state='down'
 
-
     def show_vote_table(self):
         #Удаляем текущие голосования и запускаем запрос новых
         while len(self.sm.get_screen('menu').ids.votetable.children)>0:
@@ -369,7 +391,7 @@ class EmerFundVoteApp(App):
             #c.dismiss()
 
         ThreadMessageBox(self._show_vote_table,{},self, modal=1, titleheader="Information: loading data, please wait", message="Пожалуйста, подождите, идет загрузка данных голосований")
-
+        #self._show_vote_table()
     def _show_vote_table(self):
         params={}
 
@@ -382,34 +404,78 @@ class EmerFundVoteApp(App):
 
         resp=self.votesapi.do_request('list',params)
 
+        #запуск в основном потоке
         if resp:
-            for v in resp:
-                bl = BoxLayout(orientation= 'vertical',size_hint=(1, None), height=32+32+16+5)
+            self.last_vote_table_responce=resp
+            Clock.schedule_once(self.show_vote_table_callback, 0.01)
 
-                blt = BoxLayout(orientation= 'horizontal',size_hint=(1, None), height=32)
-                blb = BoxLayout(orientation= 'horizontal')
+    def show_vote_table_callback(self,*args):
+        children_height = 32+32+16+5
+
+        resp=self.last_vote_table_responce
+
+        for v in resp:
+            bl = BoxLayout(orientation= 'vertical',size_hint=(1, None), height=children_height)
+
+            blt = BoxLayout(orientation= 'horizontal',size_hint=(1, None), height=32)
+            blb = BoxLayout(orientation= 'horizontal')
 
 
-                #votes
-                blt.add_widget(ToggleButton(text='YES',size_hint=(None, 1), width=32,group='gg%s'%v['question_id'],id='by%s'%v['question_id'])) #, on_press=self.open_3
-                blt.add_widget(ToggleButton(text='NO',size_hint=(None, 1), width=32,group='gg%s'%v['question_id'],id='bn%s'%v['question_id'])) #, on_press=self.open_3
-                #blt.add_widget(Label(text='#%s:%s'%(v['question_id'],v['name']),size_hint=(None,1), width=200))
-                #blt.add_widget(Label(text='Q:%s'%v['qmin'],size_hint=(None,1), width=50))
-                #blt.add_widget(Label(text='L:%s'%v['lmin'],size_hint=(None,1), width=50))
-                #blt.add_widget(Label(text='%s - %s'%(v['begin_date'],v['end_date']),size_hint=(None,1), width=200))
+            #votes
+            blt.add_widget(ToggleButton(text='YES',on_press=self.on_vote_button_press,background_color=(1,1.2,1.5,1),size_hint=(None, 1), width=32,group='gg%s'%v['question_id'],id='by%s'%v['question_id'])) #, on_press=self.open_3
+            blt.add_widget(ToggleButton(text='NO',on_press=self.on_vote_button_press,background_color=(1,1.2,1.5,1),size_hint=(None, 1), width=32,group='gg%s'%v['question_id'],id='bn%s'%v['question_id'])) #, on_press=self.open_3
 
-                blt.add_widget(Label(text='#%s:%s'%(v['question_id'],v['name']),size_hint=(.4,1)))
-                blt.add_widget(Label(text='Q:%s'%v['qmin'],size_hint=(.1,1)))
-                blt.add_widget(Label(text='L:%s'%v['lmin'],size_hint=(.1,1)))
-                blt.add_widget(Label(text='%s - %s'%(v['begin_date'],v['end_date']),size_hint=(.4,1)))
+            #blt.add_widget(ToggleButton(text='YES',background_color=(1,1.2,1.5,1),background_normal= '',background_down= '',size_hint=(None, 1), width=32,group='gg%s'%v['question_id'],id='by%s'%v['question_id'])) #, on_press=self.open_3
+            #blt.add_widget(ToggleButton(text='NO',background_color=(1,1.2,1.5,1),background_normal= '',background_down= '',size_hint=(None, 1), width=32,group='gg%s'%v['question_id'],id='bn%s'%v['question_id'])) #, on_press=self.open_3
 
-                blb.add_widget(TextInput(text=v['descr']))
 
-                bl.add_widget(Label(text='',size_hint=(1, None), height=5))
-                bl.add_widget(blt)
-                bl.add_widget(blb)
-                self.sm.get_screen('menu').ids.votetable.add_widget(bl)
+            #background_color=(1,1.2,1.5,1)
+            #background_normal= 'atlas://data/images/defaulttheme/button'
+            #background_down= 'atlas://data/images/defaulttheme/button_pressed'
 
+
+            #blt.add_widget(Label(text='#%s:%s'%(v['question_id'],v['name']),size_hint=(None,1), width=200))
+            #blt.add_widget(Label(text='Q:%s'%v['qmin'],size_hint=(None,1), width=50))
+            #blt.add_widget(Label(text='L:%s'%v['lmin'],size_hint=(None,1), width=50))
+            #blt.add_widget(Label(text='%s - %s'%(v['begin_date'],v['end_date']),size_hint=(None,1), width=200))
+
+            blt.add_widget(Label(text='#%s:%s'%(v['question_id'],v['name']),size_hint=(.4,1)))
+            blt.add_widget(Label(text='Q:%s'%v['qmin'],size_hint=(.1,1)))
+            blt.add_widget(Label(text='L:%s'%v['lmin'],size_hint=(.1,1)))
+            blt.add_widget(Label(text='%s - %s'%(v['begin_date'],v['end_date']),size_hint=(.4,1)))
+
+            blb.add_widget(TextInput(text=v['descr']))
+
+            bl.add_widget(Label(text='',size_hint=(1, None), height=5))
+            bl.add_widget(blt)
+            bl.add_widget(blb)
+            self.sm.get_screen('menu').ids.votetable.add_widget(bl)
+
+        if len(self.sm.get_screen('menu').ids.votetable.children)>0:
+            self.sm.get_screen('menu').ids.votetable.height=len(self.sm.get_screen('menu').ids.votetable.children)*children_height
+        else:
+            self.sm.get_screen('menu').ids.votetable.height=400
+
+    def on_vote_button_press(self,btn):
+        if btn.parent.children[len(btn.parent.children)-1].state=='down':
+            btn.parent.children[len(btn.parent.children)-1].background_color=(1,1.8,0.8,1)
+        else:
+            btn.parent.children[len(btn.parent.children)-1].background_color=(1,1.2,1.5,1)
+
+        if btn.parent.children[len(btn.parent.children)-2].state=='down':
+            btn.parent.children[len(btn.parent.children)-2].background_color=(5,0.7,0.4,1)
+        else:
+            btn.parent.children[len(btn.parent.children)-2].background_color=(1,1.2,1.5,1)
+
+        '''
+        if btn.state=='down':
+            if btn.text=='YES':
+                btn.background_color=(1,2,1,1)
+            else:
+                btn.background_color=(2,1,1,1)
+        else:
+            btn.background_color=(1,1.2,1.5,1)
+        '''
 
     def debug_send(self,req,data):
         #pass
@@ -472,40 +538,42 @@ class EmerFundVoteApp(App):
     def add_address_panel(self,n,ltext,addr):
         bl=BoxLayout(orientation= 'horizontal',size_hint=(1, None), height=32)
         bl.add_widget(Label(text=ltext,size_hint=(None,1), width=100))
-        bl.add_widget(ToggleButton(text=addr,id='adr%s'%n)) #, on_press=self.open_3
+        bl.add_widget(ToggleButton(text=addr,id='adr%s'%n,background_color=(1,1.2,1.5,1))) #, on_press=self.open_3
+
         self.sm.get_screen('settings').ids.gladdresses.add_widget(bl)
         return bl
 
-    def rebuild_addresses_list(self):
-         ThreadMessageBox(self._rebuild_addresses_list,{},self, modal=1, titleheader="Information: loading data, please wait", message="Пожалуйста, подождите, идет загрузка данных")
-
     def settings_manual_add_address(self):
          MessageBox(self, options=({"Ok": "settings_add_update_address_button('\%s')","Cancel": ""}), edit_add=True , titleheader="Request: please enter a new address", message="Пожалуйста введите новый адрес")
+
+    def rebuild_addresses_list(self):
+        #Удаление старых элементов. Пока не практикуем.
+        for c in self.sm.get_screen('settings').ids.gladdresses.children:
+            pass
+        ThreadMessageBox(self._rebuild_addresses_list,{},self, modal=1, titleheader="Information: loading data, please wait", message="Пожалуйста, подождите, идет загрузка данных")
+
+    def rebuild_addresses_list_callback(self,*args):
+        al=self.last_rebuild_addresses_list
+        for a in al:
+            for addr in a[1]:
+                self.settings_add_update_address_button(addr,a[0])
+
 
     def _rebuild_addresses_list(self):
         #создание нового списка адресов в
         #import kivy.uix
         #gl=kivy.uix.gridlayout()
-
-
-        #Удаление старых элементов. Пока не практикуем.
-        for c in self.sm.get_screen('settings').ids.gladdresses.children:
-            pass
-
         #Добавляем (обновляем наименование) для новых, если они есть
         wm='json'
         if self.sm.get_screen('settings').ids.btwallet.state=='down':wm='wallet'
         elif self.sm.get_screen('settings').ids.btmanual.state=='down':wm='manual'
 
-        al=self.get_addresses_list(wm)
-        for a in al:
-            for addr in a[1]:
-                self.settings_add_update_address_button(addr,a[0])
-
-        #Эта функция вызвана в потоке. Если она очень быстро отработает, то окно может не закрыться. Потом даем внешнему процессу прочхаться
-        import time
-        time.sleep(0.02)
+        #Высываем функцию основного потока
+        self.last_rebuild_addresses_list = self.get_addresses_list(wm)
+        if self.last_rebuild_addresses_list:
+            Clock.schedule_once(self.rebuild_addresses_list_callback, 0.01)
 
 
 if __name__ == '__main__':
+
     EmerFundVoteApp().run()
